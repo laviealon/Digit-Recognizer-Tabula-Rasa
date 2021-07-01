@@ -1,3 +1,7 @@
+"""This file is responsible for the management of transformed image data
+so that it can be loaded into a neural network created by <network.py>."""
+
+
 from typing import List
 
 

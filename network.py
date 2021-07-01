@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Tuple, Optional
-from training_data_pair import TrainingDataPair
+from data_manager import TrainingDataPair
 from random import uniform
 from math import exp
 
@@ -43,6 +43,17 @@ class Neuron:
         tup = next_neuron, weight
         self.next.append(tup)
         next_neuron.prev.append((self, weight))
+
+    def change_connection_weight(self, index: int, new_weight: float)\
+            -> None:
+        """Insert docstring.
+
+        Preconditions:
+            - <self.prev> (and thereby <self.next>) has at least <index + 1>
+             elements.
+        """
+        self.prev[index] = self.prev[index][0], new_weight
+        self.next[index] = self.next[index][0], new_weight
 
 
 class NeuralNetwork:
@@ -112,8 +123,10 @@ class NeuralNetwork:
                 rand_weight = uniform(-1, 1) * 10
                 neuron1.add_nextlayer_connection(neuron2, rand_weight)
 
-    def _init_first_layer(self, activations: List[float]) -> None:
+    def _set_first_layer(self, activations: List[float]) -> None:
         """Insert docstring.
+
+        To be used for the method NeuralNetwork._compute_result *only*.
 
         Preconditions:
             - len(activations) is equal to len(self.first_layer).
@@ -124,13 +137,13 @@ class NeuralNetwork:
             neuron = self.first_layer[i]
             neuron.activation = activation
 
-    def _compute_result(self) -> List[float]:
-        """ Compute the output of this neural network whose first
-        layer has already been initialized.
+    def _compute_result(self, activations: List[float]) -> List[float]:
+        """ Set the first layer of this network and compute its output.
 
-        Preconditions:
-            - init_first_layer has already been called on this network.
         """
+        # set first layer
+        self._set_first_layer(activations)
+        # calculate the activations of all neurons in middle layers
         for layer in self._middle_layers:
             for neuron in layer:
                 s = 0  # initialize sum of weighted activations
@@ -139,7 +152,8 @@ class NeuralNetwork:
                     s += weighted_activ
                 s -= neuron.bias  # subtract this neuron's bias
                 neuron.activation = sigmoid(s)
-        results = []
+        # calculate the activations of all neurons in last layer
+        results = []  # list of last layer activations
         for neuron in self._last_layer:
             s = 0  # initialize sum of weighted activations
             for tup in neuron.prev:
@@ -150,20 +164,107 @@ class NeuralNetwork:
             results.append(neuron.activation)
         return results
 
-    def _costof_one_pair(self, data_pair: TrainingDataPair) -> float:
-        """Compute the cost of this network's performance of
-        this data pair.
+    def _get_num_weights_and_biases(self) -> int:
+        """Calculate the number of weights and biases in this network."""
+        # calculate the number of weights in this network
+        num_weights = len(self.first_layer) * len(self._middle_layers[0])
+        for i in range(len(self._middle_layers[1:])):
+            curr_layer = self._middle_layers[i]
+            prev_layer = self._middle_layers[i-1]
+            num_weights += len(curr_layer) * len(prev_layer)
+        num_weights += len(self._middle_layers[-1]) * len(self._last_layer)
+        # calculate the number of biases in this network
+        num_biases = 0
+        for layer in self._middle_layers:
+            num_biases += len(layer)
+        num_biases += len(self._last_layer)
+        num_weights_and_biases = num_weights + num_biases
+        return num_weights_and_biases
+
+    def _get_grad(self, expected: List[float]) -> List[float]:
+        """Get the gradient of this network's current setting (based on
+        one training example).
 
         Preconditions:
-            - data_pair is a valid data pair for this neural network.
+            - <expected> is a valid output for this network.
         """
         pass
 
+    def _get_stoch_gradient(self, data_sample: List[TrainingDataPair]) \
+            -> List[float]:
+        """Compute the negative stochastic gradient (i.e. average approximate
+        gradient) of this network's cost using a data sample.
 
+        Preconditions:
+            - <data_sample> is a valid data sample for this neural network, see
+            this library's README for more information about how training data
+            is processed.
+        """
+        # create an placeholder list representing our gradient vector
+        num_weights_and_biases = self._get_num_weights_and_biases()
+        grad = [0 for _ in range(num_weights_and_biases)]
+        # find the average gradient of the cost of all pairs in
+        # this data sample.
+        for pair in data_sample:
+            curr_grad = self._get_grad(pair.exp_output)
+            grad = list_addition(grad, curr_grad)
+        grad = list_division(grad, len(data_sample))
+        return grad
+
+    def _adjust_network(self, grad: List[float]) -> None:
+        """Adjust this network's weights and biases based on the gradient
+        vector <grad>.
+
+        Preconditions:
+            - <grad> is a valid gradient vector for this network.
+             What qualifies a valid gradient vector is outlined in this
+             library's README file.
+        """
+        # adjust weights between first layer and second layer
+        for j in range(len(self._middle_layers[0])):
+            neuron = self._middle_layers[0][j]
+            for k in range(len(neuron.prev)):
+                ell = len(self.first_layer)
+                neuron.change_connection_weight(k, grad[k + (ell * j)])
+        # adjust weights between all middle layers
+        pass
+        # adjust weights between second last layer and last layer
+        pass
+        # adjust all biases
+        pass
 
 
 def sigmoid(x: float) -> float:
+    """Calculate the sigmoid function (also called the logistic function) of
+    the parameter <x>."""
     return 1 / (1 + exp(-x))
+
+
+def list_addition(lst1: List[float], lst2: List[float]) -> List[float]:
+    """Return a list whose element at an arbitrary index <i> is the sum of
+    <lst1[i]> and <lst2[i]>.
+
+    Preconditions:
+        - <lst1> and <lst2> are the same size.
+
+    >>> lst_a, lst_b = [1, 1, 2, 3, 10], [7, 9, 10, 2, 1]
+    >>> list_addition(lst_a, lst_b)
+    [8, 10, 12, 5, 11]
+    """
+    return_lst = []
+    for i in range(len(lst1)):
+        return_lst.append(lst1[i] + lst2[i])
+    return return_lst
+
+
+def list_division(lst: List[float], num: float) -> List[float]:
+    """Return a list whose element at an arbitrary index <i> is equal to
+    <lst[i]> divided by <num>.
+    """
+    return_lst = []
+    for item in lst:
+        return_lst.append(item / num)
+    return return_lst
 
 
 if __name__ == '__main__':
@@ -173,4 +274,5 @@ if __name__ == '__main__':
     network.init_first_layer([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
     print(network.compute_result())
     """
-    pass
+    import doctest
+    doctest.testmod()
