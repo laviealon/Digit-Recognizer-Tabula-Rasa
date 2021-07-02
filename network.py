@@ -44,16 +44,16 @@ class Neuron:
         self.next.append(tup)
         next_neuron.prev.append((self, weight))
 
-    def change_connection_weight(self, index: int, new_weight: float)\
+    def change_connection_weight(self, prev_index: int, new_weight: float)\
             -> None:
         """Insert docstring.
 
         Preconditions:
-            - <self.prev> (and thereby <self.next>) has at least <index + 1>
-             elements.
+            - <self.prev> (and thereby <self.next>) has at least
+            <prev_index + 1> elements.
         """
-        self.prev[index] = self.prev[index][0], new_weight
-        self.next[index] = self.next[index][0], new_weight
+        self.prev[prev_index] = self.prev[prev_index][0], new_weight
+        self.next[prev_index] = self.next[prev_index][0], new_weight
 
 
 class NeuralNetwork:
@@ -168,7 +168,7 @@ class NeuralNetwork:
         """Calculate the number of weights and biases in this network."""
         # calculate the number of weights in this network
         num_weights = len(self.first_layer) * len(self._middle_layers[0])
-        for i in range(len(self._middle_layers[1:])):
+        for i in range(1, len(self._middle_layers)):
             curr_layer = self._middle_layers[i]
             prev_layer = self._middle_layers[i-1]
             num_weights += len(curr_layer) * len(prev_layer)
@@ -220,18 +220,54 @@ class NeuralNetwork:
              What qualifies a valid gradient vector is outlined in this
              library's README file.
         """
+        # TODO: trace this code for a sample neural network. Make sure it works!
+        # set useful variables
+        len_first = len(self.first_layer)
+        len_middle = len(self._middle_layers[0])  # we know middle layer must
+        # contain at least one value since that is a representation invariant.
+        # see class <NeuralNetwork>.
+        num_middle_layers = len(self._middle_layers)
+        # adjust all weights
         # adjust weights between first layer and second layer
         for j in range(len(self._middle_layers[0])):
             neuron = self._middle_layers[0][j]
             for k in range(len(neuron.prev)):
-                ell = len(self.first_layer)
-                neuron.change_connection_weight(k, grad[k + (ell * j)])
+                z = k + (len_first * j)
+                neuron.change_connection_weight(k, grad[z])
         # adjust weights between all middle layers
-        pass
+        for i in range(1, len(self._middle_layers)):
+            layer = self._middle_layers[i]
+            for j in range(len(layer)):
+                neuron = layer[j]
+                for k in range(len(neuron.prev)):
+                    if i == 1:
+                        z = k + (len_middle * j) + (len_middle * len_first * i)
+                    else:
+                        z1 = k + (len_middle * len_first) + (len_middle * (i-1))
+                        z2 = len_middle * j
+                        z = z1 + z2
+                    neuron.change_connection_weight(k, grad[z])
         # adjust weights between second last layer and last layer
-        pass
+        for j in range(len(self._middle_layers[-1])):
+            neuron = self._middle_layers[-1][j]
+            for k in range(len(neuron.prev)):
+                z1 = k + (len_middle * len_first)
+                z2 = ((num_middle_layers - 1) * len_middle) + (len_middle * j)
+                z = z1 + z2
+                neuron.change_connection_weight(k, grad[z])
         # adjust all biases
-        pass
+        # adjust weights of all middle layers
+        base = (len_middle * len_first) + (num_middle_layers * len_middle)
+        for i in range(len(self._middle_layers)):
+            layer = self._middle_layers[i]
+            for j in range(len(layer)):
+                neuron = layer[j]
+                z = base + (len_middle * i) + j
+                neuron.bias = grad[z]
+        for j in range(len(self._last_layer)):
+            neuron = self._last_layer[j]
+            z = base + (len_middle * num_middle_layers) + j
+            neuron.bias = grad[z]
 
 
 def sigmoid(x: float) -> float:
