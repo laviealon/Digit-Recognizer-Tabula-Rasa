@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Tuple, Optional
-from data_manager import TrainingDataPair
+from data_manager import TrainingDataPair, collect_sample
 from random import uniform
 from math import exp
 
@@ -144,7 +144,7 @@ class NeuralNetwork:
     def _set_first_layer(self, activations: List[float]) -> None:
         """Insert docstring.
 
-        To be used for the method NeuralNetwork._compute_result *only*.
+        To be called by the method NeuralNetwork._compute_result *only*.
 
         Preconditions:
             - len(activations) is equal to len(self.first_layer).
@@ -156,7 +156,7 @@ class NeuralNetwork:
             neuron.activation = activation
 
     def _compute_result(self, activations: List[float]) -> List[float]:
-        """ Set the first layer of this network and compute its output.
+        """Set the first layer of this network and compute its output.
 
         """
         # set first layer
@@ -205,6 +205,8 @@ class NeuralNetwork:
         of the network. Each element in a given list is the derivative
         of the network's cost function with respect to the neuron (activation)
         that element represents.
+
+        To be used by method NeuralNetwork._get_grad *only*.
         """
         # calculate partial derivative of the cost function w.r.t. each neuron,
         # storing it in a list.
@@ -319,9 +321,11 @@ class NeuralNetwork:
         # find the average gradient of the cost of all pairs in
         # this data sample.
         for pair in data_sample:
+            self._compute_result(pair.inp)
             curr_grad = self._get_grad(pair.exp_output)
             grad = list_addition(grad, curr_grad)
         grad = list_division(grad, len(data_sample))
+        grad = list_multiplication(grad, -1)
         return grad
 
     def _adjust_network(self, grad: List[float]) -> None:
@@ -386,6 +390,22 @@ class NeuralNetwork:
             z = b + (len_middle * num_middle_layers) + j
             neuron.bias = grad[z]
 
+    def train_network(self, training_data: List[TrainingDataPair],
+                      sample_size: int = 500, rounds: int = 500) -> None:
+        """Train the network using the training data in <training_data>. Each
+        round of stochastic gradient calculation (called a 'sampling round'),
+        a random sample of size <sample_size> is taken. There are <rounds>
+        rounds.
+
+        Preconditions:
+            - <training_data> contains only training data pairs valid for this
+             network.
+        """
+        for _ in range(rounds):  # loop through rounds
+            sample = collect_sample(training_data, sample_size)
+            stoch_grad = self._get_stoch_gradient(sample)
+            self._adjust_network(stoch_grad)
+
 
 def sigmoid(x: float) -> float:
     """Calculate the sigmoid function (also called the logistic function) of
@@ -413,6 +433,15 @@ def list_addition(lst1: List[float], lst2: List[float]) -> List[float]:
     return_lst = []
     for i in range(len(lst1)):
         return_lst.append(lst1[i] + lst2[i])
+    return return_lst
+
+
+def list_multiplication(lst: List[float], num: float) -> List[float]:
+    """Return a list whose element at an arbitrary index <i> is equal to
+    <lst[i] * num>."""
+    return_lst = []
+    for item in lst:
+        return_lst.append(item * num)
     return return_lst
 
 
