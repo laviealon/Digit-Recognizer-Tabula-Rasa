@@ -220,53 +220,57 @@ class NeuralNetwork:
              What qualifies a valid gradient vector is outlined in this
              library's README file.
         """
-        # TODO: trace this code for a sample neural network. Make sure it works!
         # set useful variables
         len_first = len(self.first_layer)
         len_middle = len(self._middle_layers[0])  # we know middle layer must
         # contain at least one value since that is a representation invariant.
         # see class <NeuralNetwork>.
         num_middle_layers = len(self._middle_layers)
+        len_last = len(self._last_layer)
         # adjust all weights
         # adjust weights between first layer and second layer
-        for j in range(len(self._middle_layers[0])):
+        for j in range(len_middle):
             neuron = self._middle_layers[0][j]
             for k in range(len(neuron.prev)):
                 z = k + (len_first * j)
                 neuron.change_connection_weight(k, grad[z])
         # adjust weights between all middle layers
-        for i in range(1, len(self._middle_layers)):
+        for i in range(1, num_middle_layers):
             layer = self._middle_layers[i]
             for j in range(len(layer)):
                 neuron = layer[j]
                 for k in range(len(neuron.prev)):
-                    if i == 1:
-                        z = k + (len_middle * j) + (len_middle * len_first * i)
-                    else:
-                        z1 = k + (len_middle * len_first) + (len_middle * (i-1))
-                        z2 = len_middle * j
-                        z = z1 + z2
+                    # # if i == 1:
+                    # z = k + (len_middle * j) + (len_middle * len_first * i)
+                    # # else:
+                    z1 = k + (len_middle * len_first) + (len_middle * j)
+                    z2 = len_middle * len_middle * (i-1)
+                    z = z1 + z2
                     neuron.change_connection_weight(k, grad[z])
         # adjust weights between second last layer and last layer
-        for j in range(len(self._middle_layers[-1])):
-            neuron = self._middle_layers[-1][j]
+        for j in range(len(self._last_layer)):
+            neuron = self._last_layer[j]
             for k in range(len(neuron.prev)):
                 z1 = k + (len_middle * len_first)
                 z2 = ((num_middle_layers - 1) * len_middle) + (len_middle * j)
                 z = z1 + z2
                 neuron.change_connection_weight(k, grad[z])
         # adjust all biases
-        # adjust weights of all middle layers
-        base = (len_middle * len_first) + (num_middle_layers * len_middle)
-        for i in range(len(self._middle_layers)):
+        # adjust biases of all middle layers
+        b1 = (len_middle * len_first)
+        b2 = ((num_middle_layers - 1) * (len_middle * len_middle))
+        b3 = (len_middle * len_last)
+        b = b1 + b2 + b3
+        for i in range(num_middle_layers):
             layer = self._middle_layers[i]
             for j in range(len(layer)):
                 neuron = layer[j]
-                z = base + (len_middle * i) + j
+                z = b + (len_middle * i) + j
                 neuron.bias = grad[z]
+        # adjust biases of last layer
         for j in range(len(self._last_layer)):
             neuron = self._last_layer[j]
-            z = base + (len_middle * num_middle_layers) + j
+            z = b + (len_middle * num_middle_layers) + j
             neuron.bias = grad[z]
 
 
