@@ -55,6 +55,24 @@ class Neuron:
         self.prev[prev_index] = self.prev[prev_index][0], new_weight
         self.next[prev_index] = self.next[prev_index][0], new_weight
 
+    def get_z(self) -> float:
+        """Get the z-value of this neuron."""
+        s = 0
+        for tup in self.prev:
+            s += tup[0].activation * tup[1]
+        s -= self.bias
+        return s
+
+    def activate(self) -> None:
+        """Activate this neuron based on the values in <self.prev>.
+
+        Preconditions:
+            - all neurons in <self.prev> have either been activated or
+            are the first layer of a neural network which has been initialized.
+        """
+        z = self.get_z()
+        self.activation = sigmoid(z)
+
 
 class NeuralNetwork:
     """ A Neural Network.
@@ -181,14 +199,109 @@ class NeuralNetwork:
         num_weights_and_biases = num_weights + num_biases
         return num_weights_and_biases
 
-    def _get_grad(self, expected: List[float]) -> List[float]:
-        """Get the gradient of this network's current setting (based on
+    def _get_neuron_derivs(self, expected_results: List[float])\
+        -> List[List[float]]:
+        """Return a list of lists, where each list represents a layer
+        of the network. Each element in a given list is the derivative
+        of the network's cost function with respect to the neuron (activation)
+        that element represents.
+        """
+        # calculate partial derivative of the cost function w.r.t. each neuron,
+        # storing it in a list.
+        neuron_derivatives = []
+        # calculate derivatives for last layer
+        curr_layer = []  # list of derivatives of cost w.r.t. neurons in the
+        # last layer
+        for j in range(len(self._last_layer)):
+            actual = self._last_layer[j].activation
+            expected = expected_results[j]
+            deriv = 2 * (actual - expected)
+            curr_layer.append(deriv)
+        neuron_derivatives.append(curr_layer[:])
+        prev_layer = curr_layer[:]
+        curr_layer = []
+        # calculate derivatives for middle layers
+        for i in range(len(self._middle_layers), -1, -1):
+            for j in range(len(self._middle_layers[i])):
+                neuron = self._middle_layers[i][j]
+                deriv = 0
+                for k in range(len(neuron.next)):
+                    tup = neuron.next[k]
+                    weight = tup[1]
+                    sig = sigmoid_deriv(tup[0].get_z())
+                    prev_deriv = prev_layer[k]
+                    deriv += weight * sig * prev_deriv
+                curr_layer.append(deriv)
+            neuron_derivatives.append(curr_layer[:])
+            prev_layer = curr_layer[:]
+            curr_layer = []
+        # calculate derivatives for first layer
+        for j in range(len(self.first_layer)):
+            neuron = self.first_layer[j]
+            deriv = 0
+            for k in range(len(neuron.next)):
+                tup = neuron.next[k]
+                weight = tup[1]
+                sig = sigmoid_deriv(tup[0].get_z())
+                prev_deriv = prev_layer[k]
+                deriv += weight * sig * prev_deriv
+            curr_layer.append(deriv)
+            neuron_derivatives.append(curr_layer[:])
+            neuron_derivatives.reverse()
+        return neuron_derivatives
+
+    def _get_grad(self, expected_results: List[float]) -> List[float]:
+        """Get the gradient of the current network (based on
         one training example).
 
         Preconditions:
             - <expected> is a valid output for this network.
         """
-        pass
+        # set empty list to hold derivatives
+        grad = []
+        nd = self._get_neuron_derivs(expected_results)
+        # get derivatives of cost w.r.t. middle layer weights
+        for i in range(len(self._middle_layers)):
+            layer = self._middle_layers[i]
+            for j in range(len(layer)):
+                neuron = layer[j]
+                for k in range(len(neuron.prev)):
+                    # want to find dC/dw for w_jk^(i).
+                    prev_neur = neuron.prev[k][0]
+                    dzdw = prev_neur.activation
+                    dadz = sigmoid_deriv(neuron.get_z())
+                    dcda = nd[i + 1][j]
+                    deriv = dzdw * dadz * dcda
+                    grad.append(deriv)
+        # get derivatives of cost w.r.t. last layer weights
+        for j in range(len(self._last_layer)):
+            neuron = self._last_layer[j]
+            for k in range(len(neuron.prev)):
+                prev_neur = neuron.prev[k][0]
+                dzdw = prev_neur.activation
+                dadz = sigmoid_deriv(neuron.get_z())
+                dcda = nd[-1][j]
+                deriv = dzdw * dadz * dcda
+                grad.append(deriv)
+        # get derivatives of cost w.r.t to middle layer biases
+        for i in range(len(self._middle_layers)):
+            layer = self._middle_layers[i]
+            for j in range(len(layer)):
+                neuron = layer[j]
+                dzdw = 1  # redundant line but necessary for clarity
+                dadz = sigmoid_deriv(neuron.get_z())
+                dcda = nd[i + 1][j]
+                deriv = dzdw * dadz * dcda
+                grad.append(deriv)
+        # get derivatives of cost w.r.t to last layer biases
+        for j in range(len(self._last_layer)):
+            neuron = self._last_layer[j]
+            dzdw = 1  # redundant line but necessary for clarity
+            dadz = sigmoid_deriv(neuron.get_z())
+            dcda = nd[-1][j]
+            deriv = dzdw * dadz * dcda
+            grad.append(deriv)
+        return grad
 
     def _get_stoch_gradient(self, data_sample: List[TrainingDataPair]) \
             -> List[float]:
@@ -278,6 +391,12 @@ def sigmoid(x: float) -> float:
     """Calculate the sigmoid function (also called the logistic function) of
     the parameter <x>."""
     return 1 / (1 + exp(-x))
+
+
+def sigmoid_deriv(x: float) -> float:
+    """Calculate the derivative of the sigmoid function as evaluated at <x>."""
+    s = sigmoid(x)
+    return s + (1 - s)
 
 
 def list_addition(lst1: List[float], lst2: List[float]) -> List[float]:
