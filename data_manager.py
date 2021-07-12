@@ -5,7 +5,7 @@ from random import choices
 from typing import List
 
 
-class TrainingDataPair:
+class DataPair:
     inp: List[float]
     exp_output: List[float]
 
@@ -14,8 +14,8 @@ class TrainingDataPair:
         self.exp_output = outp
 
 
-def collect_sample(pop: List[TrainingDataPair], sample_size: int) \
-                    -> List[TrainingDataPair]:
+def collect_sample(pop: List[DataPair], sample_size: int) \
+                    -> List[DataPair]:
     """Collect a random sample of size <sample_size> from <pop>."""
     return choices(pop, k=sample_size)
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Tuple, Optional
-from data_manager import TrainingDataPair, collect_sample
+from data_manager import DataPair, collect_sample
 from random import uniform
 from math import exp
 
@@ -223,7 +223,7 @@ class NeuralNetwork:
         prev_layer = curr_layer[:]
         curr_layer = []
         # calculate derivatives for middle layers
-        for i in range(len(self._middle_layers), -1, -1):
+        for i in range(len(self._middle_layers) - 1, -1, -1):
             for j in range(len(self._middle_layers[i])):
                 neuron = self._middle_layers[i][j]
                 deriv = 0
@@ -248,8 +248,8 @@ class NeuralNetwork:
                 prev_deriv = prev_layer[k]
                 deriv += weight * sig * prev_deriv
             curr_layer.append(deriv)
-            neuron_derivatives.append(curr_layer[:])
-            neuron_derivatives.reverse()
+        neuron_derivatives.append(curr_layer[:])
+        neuron_derivatives.reverse()
         return neuron_derivatives
 
     def _get_grad(self, expected_results: List[float]) -> List[float]:
@@ -305,7 +305,7 @@ class NeuralNetwork:
             grad.append(deriv)
         return grad
 
-    def _get_stoch_gradient(self, data_sample: List[TrainingDataPair]) \
+    def _get_stoch_gradient(self, data_sample: List[DataPair]) \
             -> List[float]:
         """Compute the negative stochastic gradient (i.e. average approximate
         gradient) of this network's cost using a data sample.
@@ -390,7 +390,7 @@ class NeuralNetwork:
             z = b + (len_middle * num_middle_layers) + j
             neuron.bias = grad[z]
 
-    def train_network(self, training_data: List[TrainingDataPair],
+    def train_network(self, training_data: List[DataPair],
                       sample_size: int = 500, rounds: int = 500) -> None:
         """Train the network using the training data in <training_data>. Each
         round of stochastic gradient calculation (called a 'sampling round'),
@@ -405,6 +405,22 @@ class NeuralNetwork:
             sample = collect_sample(training_data, sample_size)
             stoch_grad = self._get_stoch_gradient(sample)
             self._adjust_network(stoch_grad)
+
+    def network_test(self, test_data: List[DataPair]) -> float:
+        """Return the percent accuracy of this network's digit
+        recognition on the test data in <test_data>.
+
+        Preconditions:
+            - <test_data> contains only test data pairs valid for this network.
+        """
+        s = 0
+        for pair in test_data:
+            inp, exp_outp = pair.inp, pair.exp_output
+            actual_outp = results_to_int(self._compute_result(inp))
+            exp_outp = results_to_int(exp_outp)
+            if exp_outp == actual_outp:
+                s += 1
+        return s / len(test_data)
 
 
 def sigmoid(x: float) -> float:
@@ -453,6 +469,27 @@ def list_division(lst: List[float], num: float) -> List[float]:
     for item in lst:
         return_lst.append(item / num)
     return return_lst
+
+
+def results_to_int(results: List[float]) -> int:
+    """Interpret the network's output into a single integer, as specified
+    by this library's README.
+    """
+    max_i = 0
+    for i in range(len(results)):
+        if results[i] > results[max_i]:
+            max_i = i
+    return max_i
+
+
+def int_to_results(n: int) -> List[float]:
+    results = []
+    for i in range(10):
+        if i == n:
+            results.append(1.00)
+        else:
+            results.append(0.00)
+    return results
 
 
 if __name__ == '__main__':
