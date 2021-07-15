@@ -1,15 +1,15 @@
 """This file is responsible for the management of transformed image data
 so that it can be loaded into a neural network created by <network.py>."""
-
+import numpy as np
 from random import choices
 from typing import List
 
 
 class DataPair:
-    inp: List[float]
-    exp_output: List[float]
+    inp: np.array
+    exp_output: np.array
 
-    def __init__(self, inp: List[float], outp: List[float]) -> None:
+    def __init__(self, inp: np.array, outp: np.array) -> None:
         self.inp = inp
         self.exp_output = outp
 

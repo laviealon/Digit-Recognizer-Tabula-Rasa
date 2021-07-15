@@ -127,6 +127,14 @@ class NeuralNetwork:
             biases_derivs.append(biases_derivs_L[:])
         return weights_derivs, biases_derivs
 
+    def adjust(self, grad: Tuple[List[np.array], List[np.array]]) -> None:
+        """Adjust the neural network based on the gradient."""
+        weight_adj, bias_adj = grad
+        for i in range(len(self.weights)):
+            self.weights[i] = self.weights[i] - weight_adj[i]
+        for i in range(len(self.biases)):
+            self.biases[i] = self.biases[i] - bias_adj[i]
+
     def _get_a_derivs_array(self, l0: np.array, z1: np.array, z2: np.array,
                             z3: np.array, exp_outp: np.array) -> List[np.array]:
         """Compute the partial derivatives of the cost function wrt the
@@ -158,7 +166,7 @@ class NeuralNetwork:
         # initialize the list of the partial derivatives wrt to the second
         # layer's activations
         a1_lst = []
-        for i in range(l1):
+        for i in range(len(l1)):
             dCda = self._get_a_deriv(1, i, [l0, z1, z2, z3], exp_outp)
             a1_lst.append(dCda)
         a1 = np.array(a1_lst)
@@ -166,7 +174,7 @@ class NeuralNetwork:
         # initialize the list of the partial derivatives wrt to the third
         # layer's activations
         a2_lst = []
-        for i in range(l2):
+        for i in range(len(l2)):
             dCda = self._get_a_deriv(2, i, [l0, z1, z2, z3], exp_outp)
             a2_lst.append(dCda)
         a2 = np.array(a2_lst)
@@ -174,7 +182,7 @@ class NeuralNetwork:
         # initialize the list of the partial derivatives wrt to the final
         # layer's activations
         a3_lst = []
-        for i in range(l3):
+        for i in range(len(l3)):
             dCda = self._get_a_deriv(3, i, [l0, z1, z2, z3], exp_outp)
             a3_lst.append(dCda)
         a3 = np.array(a3_lst)
@@ -211,31 +219,76 @@ class NeuralNetwork:
             a_deriv = s
             return a_deriv
 
+    def train(self, training_data: List[DataPair]) -> None:
+        """Train this neural network on the training data given in
+        <training_data>.
+
+        Preconditions:
+        - all data pairs in <training_data> are valid pairs for this neural
+            network.
+        """
+        for data_pair in training_data:
+            grad = self.get_grad(data_pair)
+            self.adjust(grad)
+
+    def test(self, test_data: List[DataPair]) -> float:
+        trials = 0
+        successes = 0
+        for data_pair in test_data:
+            trials += 1
+            actual_outp = results_to_int(self.compute(data_pair.inp))
+            exp_outp = results_to_int(data_pair.exp_output)
+            if actual_outp == exp_outp:
+                successes += 1
+        return successes / trials
+
 
 def sigmoid(x: float) -> float:
+    """The sigmoid function."""
     return 1 / (1 + np.exp(x))
 
 
 def sigmoid_deriv(x: float) -> float:
+    """The sigmoid derivative function."""
     return sigmoid(x) * (1 - sigmoid(x))
 
 
 def sigmoid_vec(x: np.array) -> np.array:
+    """The vectorized version of the sigmoid function."""
     sigmoid_v = np.vectorize(sigmoid)
     return sigmoid_v(x)
 
 
 def sigmoid_deriv_vec(x: np.array) -> np.array:
+    """The vectorized version of the sigmoid derivative function."""
     sigmoid_deriv_v = np.vectorize(sigmoid_deriv)
     return sigmoid_deriv_v(x)
 
 
-if __name__ == '__main__':
-    # Test to make sure Neural Network works.
-    """ 
-    network = NeuralNetwork(6, 2, 16, 10)
-    network.init_first_layer([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
-    print(network.compute_result())
+def results_to_int(results: np.array) -> int:
+    """Interpret a neural network's output layer into a single integer,
+    as specified by this library's README.
     """
-    import doctest
-    doctest.testmod()
+    max_i = 0
+    for i in range(len(results)):
+        if results[i] > results[max_i]:
+            max_i = i
+    return max_i
+
+
+def int_to_results(n: int) -> np.array:
+    """Convert a single integer into a neural network's output layer,
+    as specified by this library's README.
+    """
+    results = []
+    for i in range(10):
+        if i == n:
+            results.append(1.00)
+        else:
+            results.append(0.00)
+    return np.array(results)
+
+
+if __name__ == '__main__':
+    import python_ta
+    python_ta.check_all()
